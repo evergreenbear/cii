@@ -6,92 +6,25 @@ import subprocess
 import shutil
 from pathlib import Path
 
+## TODO: perscribe types to all functions which use them
+
 """ runCmd: alias to make running commands easier (a lot of that will happen here) """
-def runCmd(cmd: str, interactive: bool = False, captureOutput: bool = False, debug: bool = True):
-    if debug:
-        print(f"+ RUNNING: {cmd}")
-
-    if captureOutput:
-        # capture output instead of streaming
-        try:
-            result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-            # last line length
-            last_line_len = len(result.stdout.rstrip().splitlines()[-1]) if result.stdout else 0
-            return result.stdout.strip(), last_line_len
-        except subprocess.CalledProcessError as e:
-            # print minimal summary of failure
-            print("Captured output:")
-            if e.stdout:
-                print(e.stdout, end="")
-            if e.stderr:
-                print(e.stderr, end="", file=sys.stderr)
-            raise
-
-    else:
-        # stream output live
-        last_line_len = 0
-        try:
-            with subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as proc:
-                for line in proc.stdout:
-                    print(line, end="")
-                    last_line_len = len(line.rstrip())
-                proc.wait()
-                if proc.returncode != 0:
-                    raise subprocess.CalledProcessError(proc.returncode, cmd)
-            return last_line_len
-        except subprocess.CalledProcessError as e:
-            print(f"Command `{e.cmd}` failed with return code {e.returncode}")
-            raise
-
-"""
-def runCmd(cmd: str, interactive: bool = False, debug: bool = True):
-    if debug:
-        print(f"+ RUNNING: {cmd}")
-
-    last_line_len = 0
-    try:
-        # run with inherited stdout/stderr so output appears live in the terminal
-        # interactive flag is just semantic here (keeps call site intent clear)
-        with subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as proc:
-            for line in proc.stdout:
-                line = line.rstrip()
-                last_line_len = len(line)
-                print(line)
-            retcode = proc.wait()
-            if retcode != 0:
-                highlightChar = "^"
-                colsAvail = runCmd("tput cols")
-                print(f"{colsAvail} are available")
-                if last_line_len > colsAvail:
-                    last_line_len = colsAvail
-
-                print(f"{colors['redBold']}{highightChar * last_line_len}")
-                err(f"A command failed to run: `{cmd}` (exit code {retcode}, last output line length={last_line_len})")
-                raise subprocess.CalledProcessError(retcode, cmd)
-        return
-    except subprocess.CalledProcessError as e:
-        # re-raise for caller to handle/crash
-        raise
-"""
-
-"""
-def runCmd(cmd: str, interactive: bool = False, debug: bool = True):
-    if debug:
-        print(f"+ RUNNING: {cmd}")
-
-    try:
-        # run with inherited stdout/stderr so output appears live in the terminal
-        # interactive flag is just semantic here (keeps call site intent clear)
-        result = subprocess.run(cmd, shell=True, check=True)
-        return result
-
-    except subprocess.CalledProcessError as e:
-        # output from the failed command is already printed to the terminal;
-        # print a minimal summary and re-raise so the caller can handle / crash.
-        print(f"{colors['redBold']}^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-        err(f"A command failed to run: `{e.cmd}` (exited with return code {e.returncode})")
-        raise
-"""
+# TODO: determine if last will actually be useful
+def runCmd(cmd: str, debug: bool = True):
+	if debug:
+		print(f"+ RUNNING: {cmd}")
+	last = 0
+	try:
+		with subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as proc:
+			for line in proc.stdout:
+				print(line, end="")
+				last = len(line.rstrip())
+			proc.wait()
+			if proc.returncode != 0:
+				raise subprocess.CalledProcessError(proc.returncode, cmd)
+			return last
+	except subprocess.CalledProcessError:
+		raise
 
 """ getMountpoints: find whether a disk is mounted, and where """
 # FIXME: determine whether to put this in Partitioner
@@ -340,7 +273,7 @@ def main():
 
     ## dependency satisfaction
     # commands, not package names
-    neededCmds = ["curl", "sfdisk", "mkfs.exfat", "mkfs.btrfs"]
+    neededCmds = ["curl", "sfdisk", "mkfs.exfat", "mkfs.btrfs", "luanti"]
     missing = []
     for cmd in neededCmds:
         if not shutil.which(cmd):
@@ -359,16 +292,19 @@ def main():
                 if doInstall.lower() == "y":
                     try:
                         getPkgs = " ".join(f"cmd:{cmd}" for cmd in missing)
-                        runCmd(f"{suCmd} apk add {getPkgs}", interactive=True)
-
+                        runCmd(f"{suCmd} apk --no-interactive add {getPkgs}")
                     except:
                         for pkg in getPkgs.split():
                             if not runCmd(f"apk search {pkg}"):
                                 print(f"\n{colors['redBold']}-> Package providing command {colors['bold']}`{pkg.removeprefix('cmd:')}` {colors['redBold']}could not be found!")
+                            else:
+                                print(f"\n{colors['redBold']}Package {colors['bold']}{pkg.removeprefix('cmd:')}{colors['redBold']} was found but could not be installed. Please do so manually.")
                         err("Something went wrong installing required packages")
                 else:
                     err("You did not enter 'y', bailing out...")
-
+            else:
+                print(f"\n{colors['bold']}Please install them before running this script.{colors['reset']}")
+                err()
 
     # send things off to user-facing install menus
     interactiveHub()
