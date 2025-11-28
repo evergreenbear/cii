@@ -7,9 +7,6 @@ import shutil
 from pathlib import Path
 
 """ runCmd: alias to make running commands easier (a lot of that will happen here) """
-import subprocess
-import sys
-
 def runCmd(cmd: str, interactive: bool = False, captureOutput: bool = False, debug: bool = True):
     if debug:
         print(f"+ RUNNING: {cmd}")
