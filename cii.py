@@ -147,9 +147,9 @@ class Partitioner:
         print("")
 
         while True:
-            target = input(f"{colors['greenBold']}Which disk would you like to install to?{colors['bold']}: ")
-            if target in [d['name'] for d in self.disks]:
-                self.installTarget = target
+            target = input(f"{colors['bold']}Which disk would you like to install to?{colors['greenBold']} [{self.disks[0]['name']}]{colors['bold']}: ")
+            if target in [d['name'] for d in self.disks] or not target:
+                self.installTarget = target or self.disks[0]['name']
                 break
             else:
                 print(colors['redBold'] + "Invalid disk. Please try again." + colors['bold'])
